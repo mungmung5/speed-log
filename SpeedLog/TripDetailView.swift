@@ -173,6 +173,7 @@ struct RouteSegment: Identifiable {
     let id: Int
     let coordinates: [CLLocationCoordinate2D]
     let color: Color
+    let isGap: Bool
 
     static let colors: [Color] = [.green, .yellow, .orange, .red]
 
@@ -183,41 +184,64 @@ struct RouteSegment: Identifiable {
         return 3
     }
 
-    static func build(from points: [TrackPoint], maxPoints: Int = 2500) -> [RouteSegment] {
-        guard points.count > 1 else { return [] }
-        let step = max(1, points.count / maxPoints)
-        var sampled: [TrackPoint] = stride(from: 0, to: points.count, by: step).map { points[$0] }
-        if let last = points.last, sampled.last != last { sampled.append(last) }
+    /// 각 구간 색의 시작 속도(km/h)
+    private static let lowerBounds: [Double] = [0, 40, 80, 110]
 
-        // 색이 자주 바뀌지 않도록 앞뒤 몇 점의 평균 속도로 판단
-        let speeds = sampled.map(\.speedKmh)
+    /// 두 점 사이가 GPS 끊김(터널, 깊은 계곡 등)인지
+    static func isGap(_ a: TrackPoint, _ b: TrackPoint) -> Bool {
+        let seconds = b.t.timeIntervalSince(a.t)
+        return seconds > 10 && a.location.distance(from: b.location) > 150
+    }
+
+    /// 기록한 점을 하나도 빼지 않고 그대로 이어 그림 (구불구불한 길도 그대로 보이게)
+    static func build(from points: [TrackPoint]) -> [RouteSegment] {
+        guard points.count > 1 else { return [] }
+
+        // 색이 너무 자주 바뀌지 않도록 앞뒤 5초 평균 속도로 판단
+        let speeds = points.map(\.speedKmh)
         let smoothed: [Double] = speeds.indices.map { i in
-            let lo = max(0, i - 3)
-            let hi = min(speeds.count - 1, i + 3)
+            let lo = max(0, i - 5)
+            let hi = min(speeds.count - 1, i + 5)
             let window = speeds[lo...hi]
             return window.reduce(0, +) / Double(window.count)
         }
 
         var result: [RouteSegment] = []
-        var current: [CLLocationCoordinate2D] = [sampled[0].coordinate]
+        var current: [CLLocationCoordinate2D] = [points[0].coordinate]
         var currentBucket = bucket(smoothed[0])
-        for i in 1..<sampled.count {
-            let b = bucket(smoothed[i])
-            current.append(sampled[i].coordinate)
-            if b != currentBucket {
-                result.append(RouteSegment(id: result.count, coordinates: current, color: colors[currentBucket]))
-                current = [sampled[i].coordinate]
-                currentBucket = b
+
+        func flush() {
+            if current.count > 1 {
+                result.append(RouteSegment(id: result.count, coordinates: current, color: colors[currentBucket], isGap: false))
             }
         }
-        if current.count > 1 {
-            result.append(RouteSegment(id: result.count, coordinates: current, color: colors[currentBucket]))
-        }
 
-        // 조각이 너무 많으면 한 줄로 표시
-        if result.count > 500 {
-            return [RouteSegment(id: 0, coordinates: sampled.map(\.coordinate), color: .blue)]
+        for i in 1..<points.count {
+            let prev = points[i - 1]
+            let p = points[i]
+
+            if isGap(prev, p) {
+                // 끊긴 구간은 회색 점선으로 따로 그림
+                flush()
+                result.append(RouteSegment(id: result.count, coordinates: [prev.coordinate, p.coordinate], color: .gray, isGap: true))
+                current = [p.coordinate]
+                currentBucket = bucket(smoothed[i])
+                continue
+            }
+
+            current.append(p.coordinate)
+            let v = smoothed[i]
+            let candidate = bucket(v)
+            // 경계 근처에서 색이 깜빡이지 않도록 3 km/h 여유를 둠
+            let crossedUp = candidate > currentBucket && v >= lowerBounds[candidate] + 3
+            let crossedDown = candidate < currentBucket && v <= lowerBounds[currentBucket] - 3
+            if crossedUp || crossedDown {
+                flush()
+                current = [p.coordinate]
+                currentBucket = candidate
+            }
         }
+        flush()
         return result
     }
 }
@@ -226,6 +250,7 @@ struct RouteMapView: View {
     let points: [TrackPoint]
     let maxSpeedAt: Date?
     private let segments: [RouteSegment]
+    @State private var satellite = false
 
     init(points: [TrackPoint], maxSpeedAt: Date?) {
         self.points = points
@@ -242,7 +267,12 @@ struct RouteMapView: View {
         Map(initialPosition: .automatic) {
             ForEach(segments) { segment in
                 MapPolyline(coordinates: segment.coordinates)
-                    .stroke(segment.color, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                    .stroke(
+                        segment.color,
+                        style: segment.isGap
+                            ? StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 6])
+                            : StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
+                    )
             }
             if let first = points.first {
                 Marker("출발", systemImage: "flag.fill", coordinate: first.coordinate)
@@ -257,7 +287,24 @@ struct RouteMapView: View {
                     .tint(.purple)
             }
         }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .mapStyle(
+            satellite
+                ? .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll)
+                : .standard(elevation: .realistic, pointsOfInterest: .excludingAll)
+        )
+        .overlay(alignment: .topTrailing) {
+            Button {
+                satellite.toggle()
+            } label: {
+                Label(satellite ? "지도" : "위성", systemImage: satellite ? "map" : "globe.asia.australia")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+        }
     }
 }
 
@@ -267,7 +314,7 @@ struct SpeedLegend: View {
     ]
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             ForEach(items.indices, id: \.self) { i in
                 HStack(spacing: 4) {
                     Capsule()
@@ -278,8 +325,16 @@ struct SpeedLegend: View {
             }
             Text("km/h")
             Spacer()
+            HStack(spacing: 4) {
+                Capsule()
+                    .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: [3, 3]))
+                    .frame(width: 16, height: 1)
+                Text("GPS 끊김")
+            }
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
 }
