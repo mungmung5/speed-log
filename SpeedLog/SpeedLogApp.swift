@@ -52,6 +52,7 @@ struct SpeedLogApp: App {
                 .environmentObject(TripRecorder.shared)
                 .environmentObject(TripStore.shared)
                 .environmentObject(RenewalHelper.shared)
+                .environmentObject(AccountStore.shared)
         }
     }
 }
@@ -67,6 +68,8 @@ struct ContentView: View {
                 .tabItem { Label("기록", systemImage: "list.bullet.rectangle") }
             StatsView()
                 .tabItem { Label("통계", systemImage: "chart.bar.xaxis") }
+            CommunityView()
+                .tabItem { Label("함께", systemImage: "person.2") }
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape") }
         }

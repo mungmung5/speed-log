@@ -84,6 +84,14 @@ final class TripStore: ObservableObject {
         if changed { saveIndex() }
     }
 
+    /// 이 폰의 주행 기록을 모두 지움 (탈퇴할 때 선택)
+    func deleteAll() {
+        try? FileManager.default.removeItem(at: routesFolder)
+        try? FileManager.default.createDirectory(at: routesFolder, withIntermediateDirectories: true)
+        trips = []
+        saveIndex()
+    }
+
     func delete(_ trip: Trip) {
         try? FileManager.default.removeItem(at: routeURL(trip.id))
         trips.removeAll { $0.id == trip.id }
