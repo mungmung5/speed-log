@@ -5,6 +5,7 @@ import CoreLocation
 /// 주행 탭: 현재 속도와 실시간 기록
 struct RecordView: View {
     @EnvironmentObject private var recorder: TripRecorder
+    @EnvironmentObject private var renewal: RenewalHelper
     @AppStorage("keepScreenOn") private var keepScreenOn = false
     @State private var confirmStop = false
 
@@ -13,6 +14,7 @@ struct RecordView: View {
             VStack(spacing: 20) {
                 statusBar
                 permissionWarning
+                renewalBanner
                 speedometer
                 statsGrid
                 Spacer(minLength: 0)
@@ -89,6 +91,29 @@ struct RecordView: View {
             warningBox("위치 권한이 꺼져 있어 기록할 수 없어요.")
         } else if !recorder.preciseLocation {
             warningBox("'정확한 위치'가 꺼져 있어 속도가 부정확할 수 있어요.")
+        }
+    }
+
+    @ViewBuilder
+    private var renewalBanner: some View {
+        if renewal.needsRenewalSoon {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.badge.exclamationmark")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("앱 사용 기간이 \(renewal.remainingText) 남았어요")
+                        .font(.footnote.weight(.semibold))
+                    Text(recorder.isRecording ? "주행이 끝난 뒤 갱신하세요" : "눌러서 바로 갱신할 수 있어요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("지금 갱신") { renewal.openRefreshShortcut() }
+                    .font(.footnote.weight(.semibold))
+                    .disabled(recorder.isRecording)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 

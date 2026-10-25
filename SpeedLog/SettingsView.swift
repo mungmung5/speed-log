@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @EnvironmentObject private var recorder: TripRecorder
     @EnvironmentObject private var store: TripStore
+    @EnvironmentObject private var renewal: RenewalHelper
     @AppStorage("keepScreenOn") private var keepScreenOn = false
     @State private var shareItem: ShareItem?
     @State private var importing = false
@@ -75,6 +76,28 @@ struct SettingsView: View {
                     Text("백업")
                 } footer: {
                     Text("기록은 이 아이폰에만 저장돼요. 앱을 지우면 기록도 지워지니 가끔 백업해 두세요. '파일' 앱 › 나의 iPhone › Speed Log 폴더에서도 볼 수 있어요.")
+                }
+
+                Section {
+                    LabeledContent(
+                        "사용 기간 만료",
+                        value: renewal.expiration.map { Fmt.dateTime.string(from: $0) } ?? "확인할 수 없음"
+                    )
+                    LabeledContent("남은 기간", value: renewal.remainingText)
+                    Toggle("만료 하루 전 알림", isOn: $renewal.remindersOn)
+                    HStack {
+                        Text("갱신 단축어 이름")
+                        Spacer()
+                        TextField(RenewalHelper.defaultShortcutName, text: $renewal.shortcutName)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("지금 갱신") { renewal.openRefreshShortcut() }
+                        .disabled(recorder.isRecording)
+                } header: {
+                    Text("앱 갱신 (SideStore)")
+                } footer: {
+                    Text("무료 Apple ID로 설치한 앱은 7일마다 갱신해야 해요.\n\n처음 한 번만: 단축어 앱에서 새 단축어를 만들고 SideStore의 '새로 고침' 동작을 넣은 뒤, 위 칸과 같은 이름으로 저장하세요. 그러면 알림이나 '지금 갱신' 버튼 한 번으로 갱신돼요.\n\n자동화 › 시간 › 매일 새벽으로 이 단축어를 '즉시 실행'해 두면 알아서 갱신돼요. 갱신하면 앱이 다시 설치되며 잠깐 꺼지니 주행 중에는 하지 마세요.")
                 }
 
                 Section("앱 정보") {

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -9,7 +10,35 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         // 위치 변화로 백그라운드에서 깨어났을 때도 기록기를 바로 준비
         _ = TripRecorder.shared
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    /// 앱을 보고 있을 때도 알림을 배너로 표시
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
+    /// 갱신 알림을 누르면 갱신 단축어 실행
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let isRenewal = response.notification.request.identifier == renewalNotificationID
+        completionHandler()
+        guard isRenewal else { return }
+        Task { @MainActor in
+            // 앱이 화면에 완전히 뜬 뒤 실행
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            RenewalHelper.shared.handleReminderTap()
+        }
     }
 }
 
@@ -22,11 +51,14 @@ struct SpeedLogApp: App {
             ContentView()
                 .environmentObject(TripRecorder.shared)
                 .environmentObject(TripStore.shared)
+                .environmentObject(RenewalHelper.shared)
         }
     }
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         TabView {
             RecordView()
@@ -38,5 +70,9 @@ struct ContentView: View {
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape") }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { RenewalHelper.shared.refresh() }
+        }
+        .onAppear { RenewalHelper.shared.refresh() }
     }
 }
