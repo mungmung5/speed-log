@@ -146,6 +146,7 @@ struct RecordView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+        .layoutPriority(-1)
     }
 
     private var statsGrid: some View {
@@ -169,6 +170,7 @@ struct RecordView: View {
         }
     }
 
+    /// 운전석에서도 쉽게 누를 수 있도록 크게
     private var actionButton: some View {
         Button {
             if recorder.isRecording {
@@ -177,16 +179,31 @@ struct RecordView: View {
                 recorder.start()
             }
         } label: {
-            Label(
-                recorder.isRecording ? "주행 종료" : "주행 시작",
-                systemImage: recorder.isRecording ? "stop.fill" : "play.fill"
+            HStack(spacing: 14) {
+                Image(systemName: recorder.isRecording ? "stop.fill" : "play.fill")
+                    .font(.system(size: 30, weight: .bold))
+                Text(recorder.isRecording ? "주행 종료" : "주행 시작")
+                    .font(.system(size: 32, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 108)
+            .background(
+                recorder.isRecording ? Color.red : Color.blue,
+                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
             )
-            .font(.title3.weight(.bold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: 18))
-        .tint(recorder.isRecording ? Color.red : Color.blue)
+        .buttonStyle(PressableButtonStyle())
+        .sensoryFeedback(.impact(weight: .heavy), trigger: recorder.isRecording)
+    }
+}
+
+/// 누르는 순간 살짝 작아져서 눌린 게 느껴지게
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
