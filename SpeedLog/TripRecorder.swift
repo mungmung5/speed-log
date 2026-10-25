@@ -16,6 +16,8 @@ final class TripRecorder: NSObject, ObservableObject {
     @Published private(set) var maxSpeed: Double = 0            // m/s
     @Published private(set) var movingTime: TimeInterval = 0
     @Published private(set) var gpsAccuracy: Double?
+    @Published private(set) var altitude: Double?               // 현재 해발 고도(m)
+    @Published private(set) var liveCurveCount = 0              // 지금까지 지난 커브 수
     @Published private(set) var authorization: CLAuthorizationStatus
     @Published private(set) var preciseLocation = true
     @Published private(set) var message: String?
@@ -47,6 +49,11 @@ final class TripRecorder: NSObject, ObservableObject {
 
     private let manager = CLLocationManager()
     private let motion = CMMotionActivityManager()
+    private let altimeter = CMAltimeter()
+    private var altimeterRunning = false
+    private var baroRelative: Double?        // 기압계: 측정 시작 후 높이 변화(m)
+    private var baroUpdatedAt: Date?
+    private var baroOffset: Double = 0       // 앱이 다시 켜졌을 때 이어 붙이기 위한 보정값
     private let store: TripStore
     private var accumulator = TripAccumulator()
     private var points: [TrackPoint] = []
@@ -145,6 +152,7 @@ final class TripRecorder: NSObject, ObservableObject {
         let result = accumulator
         let id = tripID
         let wasAuto = autoStarted
+        stopAltimeter()
         resetLive()
 
         guard result.distance >= 100, kept.count >= 2 else {
@@ -152,7 +160,7 @@ final class TripRecorder: NSObject, ObservableObject {
             return
         }
 
-        let trip = Trip(
+        var trip = Trip(
             id: id,
             start: start,
             end: max(end, start),
@@ -162,6 +170,7 @@ final class TripRecorder: NSObject, ObservableObject {
             maxSpeedAt: result.maxSpeedAt,
             autoStarted: wasAuto
         )
+        trip.analyze(kept)
         store.add(trip, points: kept)
         show("저장했어요 · \(Fmt.km(trip.distance)) · \(Fmt.duration(trip.duration))")
         Task { await store.resolveNamesIfNeeded(id) }
@@ -169,19 +178,57 @@ final class TripRecorder: NSObject, ObservableObject {
 
     // MARK: - 위치 처리
 
-    private func beginUpdates() {
+    private func beginUpdates(baroOffset offset: Double = 0) {
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = true
         manager.startUpdatingLocation()
         if backgroundSession == nil {
             backgroundSession = CLBackgroundActivitySession()
         }
+        startAltimeter(offset: offset)
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.checkAutoStop(now: Date())
+                self?.tick()
             }
         }
+    }
+
+    private func tick() {
+        guard isRecording else { return }
+        liveCurveCount = CurveAnalyzer.analyze(points).count
+        checkAutoStop(now: Date())
+    }
+
+    // MARK: - 기압계 (고갯길 오르내림을 GPS보다 정확하게)
+
+    private func startAltimeter(offset: Double) {
+        guard !altimeterRunning, CMAltimeter.isRelativeAltitudeAvailable() else { return }
+        altimeterRunning = true
+        baroOffset = offset
+        baroRelative = nil
+        baroUpdatedAt = nil
+        altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let data else { return }
+            let value = data.relativeAltitude.doubleValue
+            MainActor.assumeIsolated {
+                self.baroRelative = value
+                self.baroUpdatedAt = Date()
+            }
+        }
+    }
+
+    private func stopAltimeter() {
+        guard altimeterRunning else { return }
+        altimeter.stopRelativeAltitudeUpdates()
+        altimeterRunning = false
+        baroRelative = nil
+        baroUpdatedAt = nil
+    }
+
+    private var currentBaro: Double? {
+        guard let r = baroRelative, let at = baroUpdatedAt, Date().timeIntervalSince(at) < 10 else { return nil }
+        return baroOffset + r
     }
 
     private func handle(_ locations: [CLLocation]) {
@@ -199,12 +246,16 @@ final class TripRecorder: NSObject, ObservableObject {
 
     private func record(_ loc: CLLocation) {
         guard let start = startDate, loc.timestamp >= start.addingTimeInterval(-10) else { return }
+        let gpsAltitude: Double? = (loc.verticalAccuracy >= 0 && loc.verticalAccuracy <= 30) ? loc.altitude : nil
+        if let gpsAltitude { altitude = gpsAltitude }
         let p = TrackPoint(
             t: loc.timestamp,
             lat: loc.coordinate.latitude,
             lon: loc.coordinate.longitude,
             speed: loc.speed,
-            acc: loc.horizontalAccuracy
+            acc: loc.horizontalAccuracy,
+            alt: gpsAltitude,
+            baro: currentBaro
         )
         if accumulator.add(p, speedAccuracy: loc.speedAccuracy) {
             points.append(p)
@@ -229,6 +280,8 @@ final class TripRecorder: NSObject, ObservableObject {
         maxSpeed = 0
         movingTime = 0
         gpsAccuracy = nil
+        altitude = nil
+        liveCurveCount = 0
         points = []
         accumulator = TripAccumulator()
     }
@@ -264,7 +317,9 @@ final class TripRecorder: NSObject, ObservableObject {
         if !allowed || Date().timeIntervalSince(lastSeen) > limit {
             stop(trimTo: accumulator.lastMovingAt ?? lastSeen, manual: false)
         } else {
-            beginUpdates()
+            liveCurveCount = CurveAnalyzer.analyze(points).count
+            // 기압계는 새로 0부터 재므로 마지막 값에 이어 붙임
+            beginUpdates(baroOffset: snap.points.last(where: { $0.baro != nil })?.baro ?? 0)
         }
     }
 

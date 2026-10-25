@@ -9,6 +9,9 @@ struct MonthStat: Identifiable {
     var duration: TimeInterval = 0
     var movingTime: TimeInterval = 0
     var maxSpeed: Double = 0
+    var curves = 0
+    var hairpins = 0
+    var ascent: Double = 0
 
     var id: Date { month }
     var averageSpeed: Double { duration > 0 ? distance / duration : 0 }
@@ -19,6 +22,9 @@ struct MonthStat: Identifiable {
         duration += trip.duration
         movingTime += trip.movingTime
         maxSpeed = max(maxSpeed, trip.maxSpeed)
+        curves += trip.curveCount ?? 0
+        hairpins += trip.hairpinCount ?? 0
+        ascent += trip.ascent ?? 0
     }
 
     static func monthly(_ trips: [Trip]) -> [MonthStat] {
@@ -127,6 +133,10 @@ struct StatsView: View {
                 StatTile(title: "최고 속도", value: Fmt.kmh(s.maxSpeed))
                 StatTile(title: "1회 평균 거리", value: Fmt.km(s.count > 0 ? s.distance / Double(s.count) : 0))
             }
+            GridRow {
+                StatTile(title: "커브 (헤어핀)", value: "\(s.curves)개 (\(s.hairpins))")
+                StatTile(title: "누적 오르막", value: Fmt.meters(s.ascent))
+            }
         }
         .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
         .listRowBackground(Color.clear)
@@ -151,7 +161,10 @@ struct MonthRow: View {
                 Label(Fmt.duration(stat.duration), systemImage: "clock")
                 Label("평균 \(Fmt.speedNumber(stat.averageSpeed))", systemImage: "speedometer")
                 Label("최고 \(Fmt.speedNumber(stat.maxSpeed))", systemImage: "bolt.fill")
+                Label("커브 \(stat.curves)", systemImage: "scribble.variable")
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .font(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()

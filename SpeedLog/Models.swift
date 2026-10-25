@@ -8,10 +8,17 @@ struct TrackPoint: Codable, Hashable {
     var lon: Double
     var speed: Double    // m/s, 측정 불가면 -1
     var acc: Double      // 수평 오차(m)
+    var alt: Double?     // GPS 고도(해발 m), 부정확하면 nil
+    var baro: Double?    // 기압계로 잰 출발 지점 대비 높이 변화(m)
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lon) }
     var location: CLLocation { CLLocation(latitude: lat, longitude: lon) }
     var speedKmh: Double { max(speed, 0) * 3.6 }
+
+    /// 두 점 사이가 GPS 끊김(터널, 깊은 계곡 등)인지
+    static func isGap(_ a: TrackPoint, _ b: TrackPoint) -> Bool {
+        b.t.timeIntervalSince(a.t) > 10 && a.location.distance(from: b.location) > 150
+    }
 }
 
 /// 저장된 한 번의 운행
@@ -26,6 +33,30 @@ struct Trip: Codable, Identifiable, Hashable {
     var startName: String?
     var endName: String?
     var autoStarted: Bool?
+
+    // 고도 분석
+    var ascent: Double?            // 오르막 누적(m)
+    var descent: Double?           // 내리막 누적(m)
+    var maxAltitude: Double?
+    var minAltitude: Double?
+    // 커브 분석
+    var curveCount: Int?
+    var sharpCurveCount: Int?
+    var hairpinCount: Int?
+
+    mutating func apply(elevation e: ElevationSummary?, curves c: CurveSummary) {
+        ascent = e?.ascent
+        descent = e?.descent
+        maxAltitude = e?.maxAltitude
+        minAltitude = e?.minAltitude
+        curveCount = c.count
+        sharpCurveCount = c.sharpCount
+        hairpinCount = c.hairpinCount
+    }
+
+    mutating func analyze(_ points: [TrackPoint]) {
+        apply(elevation: ElevationAnalyzer.analyze(points), curves: CurveAnalyzer.analyze(points))
+    }
 
     /// 출발부터 도착까지 걸린 시간
     var duration: TimeInterval { max(end.timeIntervalSince(start), 0) }

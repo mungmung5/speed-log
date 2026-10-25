@@ -53,7 +53,10 @@ struct TripListView: View {
             } message: { _ in
                 Text("삭제하면 되돌릴 수 없어요.")
             }
-            .task { await store.resolveMissingNames() }
+            .task {
+                store.analyzeMissing()
+                await store.resolveMissingNames()
+            }
         }
     }
 
@@ -99,11 +102,16 @@ struct TripRow: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Label(Fmt.duration(trip.duration), systemImage: "clock")
                 Label("평균 \(Fmt.speedNumber(trip.averageSpeed))", systemImage: "speedometer")
                 Label("최고 \(Fmt.speedNumber(trip.maxSpeed))", systemImage: "bolt.fill")
+                if let curves = trip.curveCount {
+                    Label("커브 \(curves)", systemImage: "scribble.variable")
+                }
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .font(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()

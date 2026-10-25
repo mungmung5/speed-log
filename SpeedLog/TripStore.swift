@@ -66,6 +66,24 @@ final class TripStore: ObservableObject {
         saveIndex()
     }
 
+    func update(_ trip: Trip) {
+        guard let idx = trips.firstIndex(where: { $0.id == trip.id }) else { return }
+        trips[idx] = trip
+        saveIndex()
+    }
+
+    /// 커브·고도 분석이 없는 운행(이전 버전에서 기록한 것)을 분석해 채움
+    func analyzeMissing() {
+        var changed = false
+        for idx in trips.indices where trips[idx].curveCount == nil {
+            let pts = points(for: trips[idx])
+            guard pts.count >= 2 else { continue }
+            trips[idx].analyze(pts)
+            changed = true
+        }
+        if changed { saveIndex() }
+    }
+
     func delete(_ trip: Trip) {
         try? FileManager.default.removeItem(at: routeURL(trip.id))
         trips.removeAll { $0.id == trip.id }
@@ -173,7 +191,9 @@ final class TripStore: ObservableObject {
         func num(_ v: Double, _ digits: Int = 1) -> String {
             String(format: "%.\(digits)f", v)
         }
-        var lines = ["출발,도착,출발지,도착지,운행시간(분),주행시간(분),거리(km),평균속도(km/h),주행평균(km/h),최고속도(km/h)"]
+        var lines = ["출발,도착,출발지,도착지,운행시간(분),주행시간(분),거리(km),평균속도(km/h),주행평균(km/h),최고속도(km/h),오르막(m),내리막(m),최고고도(m),커브,급커브,헤어핀"]
+        func optD(_ v: Double?) -> String { v.map { String(format: "%.0f", $0) } ?? "" }
+        func optI(_ v: Int?) -> String { v.map(String.init) ?? "" }
         for t in trips.sorted(by: { $0.start < $1.start }) {
             lines.append([
                 Fmt.csv.string(from: t.start),
@@ -185,7 +205,13 @@ final class TripStore: ObservableObject {
                 num(t.distance / 1000, 2),
                 num(t.averageSpeed * 3.6),
                 num(t.movingAverageSpeed * 3.6),
-                num(t.maxSpeed * 3.6)
+                num(t.maxSpeed * 3.6),
+                optD(t.ascent),
+                optD(t.descent),
+                optD(t.maxAltitude),
+                optI(t.curveCount),
+                optI(t.sharpCurveCount),
+                optI(t.hairpinCount)
             ].joined(separator: ","))
         }
         // 엑셀에서 한글이 깨지지 않도록 BOM 추가

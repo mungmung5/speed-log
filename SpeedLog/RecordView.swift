@@ -135,6 +135,10 @@ struct RecordView: View {
                     StatTile(title: "평균 속도", value: Fmt.kmh(average))
                     StatTile(title: "최고 속도", value: Fmt.kmh(recorder.maxSpeed))
                 }
+                GridRow {
+                    StatTile(title: "고도", value: recorder.altitude.map(Fmt.meters) ?? "–")
+                    StatTile(title: "지난 커브", value: "\(recorder.liveCurveCount)개")
+                }
             }
         }
     }

@@ -16,6 +16,10 @@ enum Fmt {
         "\(speedNumber(mps)) km/h"
     }
 
+    static func meters(_ m: Double) -> String {
+        "\(Int(m.rounded())) m"
+    }
+
     /// 1:23:45 형식
     static func clock(_ seconds: TimeInterval) -> String {
         let t = Int(max(seconds, 0))
