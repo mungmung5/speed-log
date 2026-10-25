@@ -1,0 +1,79 @@
+name: Build iOS app
+
+# main에 코드가 올라오면 자동으로 빌드하고, Releases에 IPA를 올립니다.
+# Actions 탭에서 "Run workflow"로 직접 실행할 수도 있어요.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild \
+            -project SpeedLog.xcodeproj \
+            -scheme SpeedLog \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || {
+              echo "::error::빌드 실패 - 아래 오류를 확인하세요"
+              grep -E "error:|fatal" build.log | head -60
+              tail -40 build.log
+              exit 1
+            }
+          grep -E "warning:" build.log | sort -u | head -40 || true
+
+      - name: Package IPA
+        run: |
+          APP=build/Build/Products/Release-iphoneos/SpeedLog.app
+          test -d "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry SpeedLog.ipa Payload
+          ls -lh SpeedLog.ipa
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" SpeedLog.ipa \
+            --title "Speed Log 빌드 ${{ github.run_number }}" \
+            --notes "커밋: ${{ github.sha }}. 아이폰에서 SpeedLog.ipa를 내려받아 AltStore로 설치하세요." \
+            --latest
