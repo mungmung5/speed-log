@@ -133,8 +133,9 @@ struct RecordView: View {
 
     private var speedometer: some View {
         VStack(spacing: 0) {
-            Text(recorder.isRecording ? Fmt.speedNumber(recorder.currentSpeed) : "–")
+            Text(recorder.isRecording ? Fmt.speedNumber(recorder.currentSpeed) : "0")
                 .font(.system(size: 128, weight: .bold, design: .rounded))
+                .foregroundStyle(recorder.isRecording ? Color.primary : Color.secondary.opacity(0.35))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .lineLimit(1)

@@ -120,22 +120,23 @@ struct StatsView: View {
     }
 
     private func summaryGrid(_ s: MonthStat) -> some View {
-        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+        let tile = Color(.secondarySystemGroupedBackground)
+        return         Grid(horizontalSpacing: 12, verticalSpacing: 12) {
             GridRow {
-                StatTile(title: "운행", value: "\(s.count)회")
-                StatTile(title: "거리", value: Fmt.km(s.distance))
+                StatTile(title: "운행", value: "\(s.count)회", background: tile)
+                StatTile(title: "거리", value: Fmt.km(s.distance), background: tile)
             }
             GridRow {
-                StatTile(title: "운행 시간", value: Fmt.duration(s.duration))
-                StatTile(title: "평균 속도", value: Fmt.kmh(s.averageSpeed))
+                StatTile(title: "운행 시간", value: Fmt.duration(s.duration), background: tile)
+                StatTile(title: "평균 속도", value: Fmt.kmh(s.averageSpeed), background: tile)
             }
             GridRow {
-                StatTile(title: "최고 속도", value: Fmt.kmh(s.maxSpeed))
-                StatTile(title: "1회 평균 거리", value: Fmt.km(s.count > 0 ? s.distance / Double(s.count) : 0))
+                StatTile(title: "최고 속도", value: Fmt.kmh(s.maxSpeed), background: tile)
+                StatTile(title: "1회 평균 거리", value: Fmt.km(s.count > 0 ? s.distance / Double(s.count) : 0), background: tile)
             }
             GridRow {
-                StatTile(title: "커브 (헤어핀)", value: "\(s.curves)개 (\(s.hairpins))")
-                StatTile(title: "누적 오르막", value: Fmt.meters(s.ascent))
+                StatTile(title: "커브 (헤어핀)", value: "\(s.curves)개 (\(s.hairpins))", background: tile)
+                StatTile(title: "누적 오르막", value: Fmt.meters(s.ascent), background: tile)
             }
         }
         .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))

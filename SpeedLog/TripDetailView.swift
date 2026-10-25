@@ -269,7 +269,11 @@ struct SpeedSample: Identifiable {
             result.append(SpeedSample(id: result.count, time: slice[slice.startIndex].t, kmh: avg))
             i += bucket
         }
-        return result
+        // 그래프가 들쭉날쭉하지 않게 앞뒤 2칸 평균
+        let smoothed = Series.movingAverage(result.map(\.kmh), radius: 2)
+        return result.enumerated().map { i, s in
+            SpeedSample(id: s.id, time: s.time, kmh: smoothed[i])
+        }
     }
 }
 

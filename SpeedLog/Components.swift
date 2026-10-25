@@ -5,6 +5,7 @@ import UIKit
 struct StatTile: View {
     let title: String
     let value: String
+    var background = Color(.secondarySystemBackground)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -19,7 +20,7 @@ struct StatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
