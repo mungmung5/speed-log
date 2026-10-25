@@ -28,12 +28,16 @@ final class TripStore: ObservableObject {
 
     private init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        folder = docs.appendingPathComponent("SpeedLog", isDirectory: true)
+        folder = docs.appendingPathComponent(Demo.isOn ? "SpeedLogDemo" : "SpeedLog", isDirectory: true)
+        if Demo.isOn { try? FileManager.default.removeItem(at: folder) }
         try? FileManager.default.createDirectory(
             at: folder.appendingPathComponent("routes", isDirectory: true),
             withIntermediateDirectories: true
         )
         load()
+        if Demo.isOn {
+            for (trip, points) in Demo.makeTrips() { add(trip, points: points) }
+        }
     }
 
     // MARK: - 운행 목록

@@ -22,9 +22,10 @@ struct MonthGroup: Identifiable {
 struct TripListView: View {
     @EnvironmentObject private var store: TripStore
     @State private var pendingDelete: Trip?
+    @State private var path: [Trip] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if store.trips.isEmpty {
                     ContentUnavailableView(
@@ -54,6 +55,10 @@ struct TripListView: View {
                 Text("삭제하면 되돌릴 수 없어요.")
             }
             .task {
+                if Demo.has("-openFirstTrip"), path.isEmpty, let first = store.trips.first {
+                    path = [first]
+                }
+                guard !Demo.isOn else { return }
                 store.analyzeMissing()
                 await store.resolveMissingNames()
             }

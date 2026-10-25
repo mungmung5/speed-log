@@ -189,6 +189,16 @@ struct OnboardingView: View {
 
     private let lastStep = 4
 
+    init(initialStep: Int = 0) {
+        _step = State(initialValue: min(max(initialStep, 0), 4))
+        if Demo.isOn && initialStep >= 4 {
+            _nickname = State(initialValue: "산길러")
+            _privacyAgreed = State(initialValue: true)
+            _rulesAgreed = State(initialValue: true)
+            _age14 = State(initialValue: true)
+        }
+    }
+
     private var nicknameValid: Bool { AccountStore.isValidNickname(nickname) }
 
     private var canAdvance: Bool {

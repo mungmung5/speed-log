@@ -98,7 +98,8 @@ final class RenewalHelper: ObservableObject {
     private func scheduleNow() async {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [renewalNotificationID])
-        guard remindersOn,
+        guard !Demo.isOn,
+              remindersOn,
               let exp = expiration,
               let fireDate = Self.reminderDate(before: exp),
               fireDate > Date() else { return }
@@ -132,6 +133,9 @@ final class RenewalHelper: ObservableObject {
 
     /// 앱 안의 embedded.mobileprovision에서 만료 시각을 읽음
     static func readExpiration() -> Date? {
+        if let hours = Demo.value("-demoExpiryHours").flatMap(Double.init) {
+            return Date().addingTimeInterval(hours * 3_600)
+        }
         guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
               let data = try? Data(contentsOf: url),
               let start = data.range(of: Data("<?xml".utf8)),

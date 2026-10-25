@@ -20,22 +20,35 @@ struct TripDetailView: View {
     private var current: Trip { store.trips.first { $0.id == trip.id } ?? trip }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                mapSection
-                statsSection
-                if let c = curveSummary, points.count >= 2 {
-                    curveSection(c)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    mapSection
+                    statsSection
+                    if let c = curveSummary, points.count >= 2 {
+                        curveSection(c)
+                            .id("curves")
+                    }
+                    if let e = elevation {
+                        elevationSection(e)
+                            .id("elevation")
+                    }
+                    if samples.count > 2 {
+                        chartSection
+                            .id("speed")
+                    }
                 }
-                if let e = elevation {
-                    elevationSection(e)
-                }
-                if samples.count > 2 {
-                    chartSection
+                .padding()
+            }
+            .onChange(of: loaded) { _, isLoaded in
+                // 화면 캡처용: 지정한 구간으로 스크롤
+                guard isLoaded, let target = Demo.value("-detailSection") else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    proxy.scrollTo(target, anchor: .top)
                 }
             }
-            .padding()
         }
         .navigationTitle(Fmt.dateTime.string(from: trip.start))
         .navigationBarTitleDisplayMode(.inline)
@@ -337,8 +350,8 @@ struct RouteMapView: View {
     let maxSpeedAt: Date?
     private let segments: [RouteSegment]
     private let tightCurves: [Curve]
-    @State private var satellite = false
-    @State private var showCurves = false
+    @State private var satellite = Demo.has("-satellite")
+    @State private var showCurves = Demo.has("-showCurves")
 
     init(points: [TrackPoint], maxSpeedAt: Date?, curves: [Curve]) {
         self.points = points

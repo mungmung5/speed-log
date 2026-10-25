@@ -3,7 +3,7 @@ import SwiftUI
 /// '함께' 탭: 계정 만들기, 공유 설정, 차단, 탈퇴
 struct CommunityView: View {
     @EnvironmentObject private var accounts: AccountStore
-    @State private var showOnboarding = false
+    @State private var showOnboarding = Demo.value("-onboardingStep") != nil
 
     var body: some View {
         NavigationStack {
@@ -17,7 +17,7 @@ struct CommunityView: View {
             .navigationTitle("함께")
         }
         .fullScreenCover(isPresented: $showOnboarding) {
-            OnboardingView()
+            OnboardingView(initialStep: Int(Demo.value("-onboardingStep") ?? "") ?? 0)
                 .environmentObject(accounts)
         }
     }

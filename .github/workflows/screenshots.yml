@@ -1,0 +1,146 @@
+name: Screenshots
+
+# 아이폰 시뮬레이터에서 예시 데이터로 앱을 띄워 화면을 캡처합니다.
+# 결과는 screenshots 브랜치와 Actions 결과물(artifact)에 저장돼요.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screenshots.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch sample road (Hangyeryeong, route 44)
+        run: |
+          curl -sf --max-time 30 \
+            "https://router.project-osrm.org/route/v1/driving/128.383,38.111;128.537,38.078?overview=full&geometries=geojson" \
+            -o SpeedLog/DemoRoute.json || true
+          python3 -c "import json;d=json.load(open('SpeedLog/DemoRoute.json'));r=d['routes'][0];print(len(r['geometry']['coordinates']),'coords',round(r['distance']),'m')" \
+            || { echo "Using synthetic route"; rm -f SpeedLog/DemoRoute.json; }
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for simulator
+        run: |
+          xcodebuild \
+            -project SpeedLog.xcodeproj \
+            -scheme SpeedLog \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            build > build-sim.log 2>&1 || {
+              grep -E "error:" build-sim.log | head -60
+              tail -40 build-sim.log
+              exit 1
+            }
+
+      - name: Boot simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          picks = []
+          for runtime, items in devices.items():
+              if "iOS" not in runtime:
+                  continue
+              for d in items:
+                  name = d["name"]
+                  if name.startswith("iPhone") and "Pro" in name and "Max" not in name:
+                      picks.append((runtime, name, d["udid"]))
+          if not picks:
+              for runtime, items in devices.items():
+                  if "iOS" in runtime:
+                      picks += [(runtime, d["name"], d["udid"]) for d in items if d["name"].startswith("iPhone")]
+          picks.sort()
+          print(picks[-1][2])
+          print(picks[-1][1], picks[-1][0], file=sys.stderr)
+          ')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 \
+            --cellularMode active --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/SpeedLog.app
+
+      - name: Capture screens
+        run: |
+          OUT="$RUNNER_TEMP/shots"
+          mkdir -p "$OUT"
+          BUNDLE=com.mungmung5.speedlog
+
+          shot() {
+            local name=$1 wait=$2
+            shift 2
+            xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -demo "$@" \
+              -AppleLanguages "(ko)" -AppleLocale ko_KR > /dev/null
+            sleep "$wait"
+            xcrun simctl io "$UDID" screenshot "$OUT/$name.png" > /dev/null
+            echo "captured $name"
+          }
+
+          # 지도 타일을 미리 받아두기
+          shot warmup 20 -startTab 1 -openFirstTrip
+
+          shot 01-main 5 -startTab 0
+          shot 02-driving 5 -startTab 0 -demoRecording
+          shot 03-renewal-banner 5 -startTab 0 -demoExpiryHours 30
+          shot 04-trip-list 5 -startTab 1
+          shot 05-trip-detail 12 -startTab 1 -openFirstTrip
+          shot 06-trip-curves-map 12 -startTab 1 -openFirstTrip -showCurves
+          shot 07-trip-satellite 15 -startTab 1 -openFirstTrip -satellite -showCurves
+          shot 08-curve-analysis 8 -startTab 1 -openFirstTrip -detailSection curves
+          shot 09-elevation 8 -startTab 1 -openFirstTrip -detailSection elevation
+          shot 10-speed-chart 8 -startTab 1 -openFirstTrip -detailSection speed
+          shot 11-stats 6 -startTab 2
+          shot 12-together 5 -startTab 3
+          shot 13-signup-sharing 5 -startTab 3 -onboardingStep 1
+          shot 14-signup-privacy 5 -startTab 3 -onboardingStep 2
+          shot 15-signup-final 5 -startTab 3 -onboardingStep 4
+          shot 16-account 5 -startTab 3 -demoAccount
+          shot 17-settings 5 -startTab 4 -demoExpiryHours 130
+
+          xcrun simctl ui "$UDID" appearance dark
+          shot 18-driving-dark 5 -startTab 0 -demoRecording
+          shot 19-trip-detail-dark 12 -startTab 1 -openFirstTrip -showCurves
+          shot 20-stats-dark 6 -startTab 2
+
+          rm -f "$OUT/warmup.png"
+          ls -la "$OUT"
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/shots
+
+      - name: Save to screenshots branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan screenshots-tmp
+          git rm -rf --quiet .
+          git clean -fdxq
+          cp "$RUNNER_TEMP"/shots/*.png .
+          git add ./*.png
+          git commit -qm "Screenshots for ${{ github.sha }}"
+          git push -f origin HEAD:screenshots

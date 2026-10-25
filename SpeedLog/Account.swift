@@ -66,10 +66,12 @@ final class AccountStore: ObservableObject {
 
     private init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let folder = docs.appendingPathComponent("SpeedLog", isDirectory: true)
+        let folder = docs.appendingPathComponent(Demo.isOn ? "SpeedLogDemo" : "SpeedLog", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         fileURL = folder.appendingPathComponent("account.json")
-        if let data = try? Data(contentsOf: fileURL) {
+        if Demo.isOn {
+            account = Demo.has("-demoAccount") ? Demo.sampleAccount() : nil
+        } else if let data = try? Data(contentsOf: fileURL) {
             account = try? Self.decoder.decode(Account.self, from: data)
         }
     }

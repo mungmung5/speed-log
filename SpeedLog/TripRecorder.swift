@@ -84,8 +84,25 @@ final class TripRecorder: NSObject, ObservableObject {
         authorization = manager.authorizationStatus
         preciseLocation = manager.accuracyAuthorization == .fullAccuracy
 
+        if Demo.isOn {
+            if Demo.has("-demoRecording") { applyDemoRecording() }
+            return
+        }
         recoverActiveTrip()
         applyMonitoring()
+    }
+
+    /// 화면 캡처용: 주행 중인 것처럼 보이게
+    private func applyDemoRecording() {
+        isRecording = true
+        startDate = Date().addingTimeInterval(-(3_600 + 23 * 60 + 17))
+        currentSpeed = 63 / 3.6
+        distance = 48_230
+        maxSpeed = 97 / 3.6
+        movingTime = 4_400
+        gpsAccuracy = 5
+        altitude = 812
+        liveCurveCount = 57
     }
 
     var authorizationText: String {

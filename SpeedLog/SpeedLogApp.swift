@@ -59,19 +59,25 @@ struct SpeedLogApp: App {
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tab = Demo.startTab
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             RecordView()
                 .tabItem { Label("주행", systemImage: "speedometer") }
+                .tag(0)
             TripListView()
                 .tabItem { Label("기록", systemImage: "list.bullet.rectangle") }
+                .tag(1)
             StatsView()
                 .tabItem { Label("통계", systemImage: "chart.bar.xaxis") }
+                .tag(2)
             CommunityView()
                 .tabItem { Label("함께", systemImage: "person.2") }
+                .tag(3)
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape") }
+                .tag(4)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { RenewalHelper.shared.refresh() }
