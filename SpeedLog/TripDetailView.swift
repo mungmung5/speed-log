@@ -26,6 +26,7 @@ struct TripDetailView: View {
                     header
                     mapSection
                     statsSection
+                        .id("stats")
                     if let c = curveSummary, points.count >= 2 {
                         curveSection(c)
                             .id("curves")

@@ -85,7 +85,8 @@ struct StatsView: View {
         let total = MonthStat.total(store.trips)
         let chartData = MonthStat.lastTwelveMonths(monthly)
 
-        return List {
+        return ScrollViewReader { proxy in
+        List {
             Section("이번 달") {
                 summaryGrid(thisMonth)
             }
@@ -106,6 +107,7 @@ struct StatsView: View {
                 }
                 .frame(height: 200)
                 .padding(.vertical, 8)
+                .id("chart")
             }
             Section("월별") {
                 ForEach(monthly) { m in
@@ -114,9 +116,12 @@ struct StatsView: View {
             }
             Section("전체") {
                 summaryGrid(total)
+                    .id("total")
             }
         }
         .listStyle(.insetGrouped)
+        .demoScroll(proxy)
+        }
     }
 
     private func summaryGrid(_ s: MonthStat) -> some View {

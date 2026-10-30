@@ -15,6 +15,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             Form {
                 Section {
                     Toggle("자동으로 주행 시작", isOn: $recorder.autoDetect)
@@ -50,6 +51,7 @@ struct SettingsView: View {
                     }
                     .font(.footnote)
                     .padding(.vertical, 4)
+                    .id("bluetooth")
                 } header: {
                     Text("차 블루투스로 자동 시작·종료 (추천)")
                 } footer: {
@@ -103,7 +105,10 @@ struct SettingsView: View {
                 Section("앱 정보") {
                     LabeledContent("버전", value: versionText)
                     LabeledContent("저장된 주행", value: "\(store.trips.count)개")
+                        .id("bottom")
                 }
+            }
+            .demoScroll(proxy)
             }
             .navigationTitle("설정")
             .sheet(item: $shareItem) { item in

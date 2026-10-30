@@ -81,7 +81,11 @@ struct AccountView: View {
         Binding(get: { account.hideRadius }, set: { accounts.setHideRadius($0) })
     }
 
+    @State private var showConsents = false
+    @State private var showBlocked = false
+
     var body: some View {
+        ScrollViewReader { proxy in
         Form {
             Section("내 계정") {
                 LabeledContent("닉네임", value: account.nickname)
@@ -138,8 +142,30 @@ struct AccountView: View {
 
             Section {
                 Button("계정 삭제 (탈퇴)", role: .destructive) { showDelete = true }
+                    .id("bottom")
             } footer: {
                 Text("기록 공유·랭킹·채팅은 서버가 준비되면 열려요. 그때 위 설정 그대로 동작해요.")
+            }
+        }
+        .demoScroll(proxy)
+        }
+        .navigationDestination(isPresented: $showConsents) {
+            ConsentHistoryView(records: account.consents)
+        }
+        .navigationDestination(isPresented: $showBlocked) {
+            BlockedListView()
+        }
+        .onAppear {
+            // 화면 캡처용: 지정한 하위 화면 열기
+            guard let page = Demo.value("-accountPage") else { return }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                switch page {
+                case "consents": showConsents = true
+                case "blocked": showBlocked = true
+                case "delete": showDelete = true
+                default: break
+                }
             }
         }
         .alert("주행 기록 공유를 켤까요?", isPresented: $confirmShareOn) {

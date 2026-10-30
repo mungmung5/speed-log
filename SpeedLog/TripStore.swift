@@ -35,7 +35,7 @@ final class TripStore: ObservableObject {
             withIntermediateDirectories: true
         )
         load()
-        if Demo.isOn {
+        if Demo.isOn && !Demo.has("-demoEmpty") {
             for (trip, points) in Demo.makeTrips() { add(trip, points: points) }
         }
     }

@@ -35,6 +35,14 @@ struct RecordView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear(perform: updateIdleTimer)
+        .onAppear {
+            // 화면 캡처용: 종료 확인창 띄우기
+            guard Demo.has("-confirmStop") else { return }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                confirmStop = true
+            }
+        }
         .onChange(of: recorder.isRecording) { _, _ in updateIdleTimer() }
         .onChange(of: keepScreenOn) { _, _ in updateIdleTimer() }
         .confirmationDialog("주행을 종료할까요?", isPresented: $confirmStop, titleVisibility: .visible) {

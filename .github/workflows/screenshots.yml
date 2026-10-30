@@ -19,7 +19,7 @@ concurrency:
 jobs:
   screenshots:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -101,28 +101,63 @@ jobs:
           # 지도 타일을 미리 받아두기
           shot warmup 20 -startTab 1 -openFirstTrip
 
+          # 주행 탭
           shot 01-main 5 -startTab 0
           shot 02-driving 5 -startTab 0 -demoRecording
-          shot 03-renewal-banner 5 -startTab 0 -demoExpiryHours 30
-          shot 04-trip-list 5 -startTab 1
-          shot 05-trip-detail 12 -startTab 1 -openFirstTrip
-          shot 06-trip-curves-map 12 -startTab 1 -openFirstTrip -showCurves
-          shot 07-trip-satellite 15 -startTab 1 -openFirstTrip -satellite -showCurves
-          shot 08-curve-analysis 8 -startTab 1 -openFirstTrip -detailSection curves
-          shot 09-elevation 8 -startTab 1 -openFirstTrip -detailSection elevation
-          shot 10-speed-chart 8 -startTab 1 -openFirstTrip -detailSection speed
-          shot 11-stats 6 -startTab 2
-          shot 12-together 5 -startTab 3
-          shot 13-signup-sharing 5 -startTab 3 -onboardingStep 1
-          shot 14-signup-privacy 5 -startTab 3 -onboardingStep 2
-          shot 15-signup-final 5 -startTab 3 -onboardingStep 4
-          shot 16-account 5 -startTab 3 -demoAccount
-          shot 17-settings 5 -startTab 4 -demoExpiryHours 130
+          shot 03-driving-stop-confirm 6 -startTab 0 -demoRecording -confirmStop
+          shot 04-renewal-banner 5 -startTab 0 -demoExpiryHours 30
 
+          # 기록 탭과 운행 상세
+          shot 05-list 5 -startTab 1
+          shot 06-list-empty 5 -startTab 1 -demoEmpty
+          shot 07-detail-top 12 -startTab 1 -openFirstTrip
+          shot 08-detail-stats 8 -startTab 1 -openFirstTrip -detailSection stats
+          shot 09-detail-curves-map 12 -startTab 1 -openFirstTrip -showCurves
+          shot 10-detail-satellite 15 -startTab 1 -openFirstTrip -satellite -showCurves
+          shot 11-detail-curves 8 -startTab 1 -openFirstTrip -detailSection curves
+          shot 12-detail-elevation 8 -startTab 1 -openFirstTrip -detailSection elevation
+          shot 13-detail-speed 8 -startTab 1 -openFirstTrip -detailSection speed
+
+          # 통계 탭
+          shot 14-stats-top 6 -startTab 2
+          shot 15-stats-chart 7 -startTab 2 -scrollTo chart
+          shot 16-stats-total 7 -startTab 2 -scrollTo total
+          shot 17-stats-empty 5 -startTab 2 -demoEmpty
+
+          # 함께 탭: 계정 만들기
+          shot 18-together 5 -startTab 3
+          shot 19-signup-1 6 -startTab 3 -onboardingStep 0
+          shot 20-signup-2-top 6 -startTab 3 -onboardingStep 1
+          shot 21-signup-2-bottom 7 -startTab 3 -onboardingStep 1 -scrollTo bottom -shareOn
+          shot 22-signup-3-top 6 -startTab 3 -onboardingStep 2
+          shot 23-signup-3-bottom 7 -startTab 3 -onboardingStep 2 -scrollTo bottom
+          shot 24-signup-4-top 6 -startTab 3 -onboardingStep 3
+          shot 25-signup-4-bottom 7 -startTab 3 -onboardingStep 3 -scrollTo bottom
+          shot 26-signup-5-top 6 -startTab 3 -onboardingStep 4
+          shot 27-signup-5-bottom 7 -startTab 3 -onboardingStep 4 -scrollTo bottom
+
+          # 함께 탭: 내 계정
+          shot 28-account-top 5 -startTab 3 -demoAccount
+          shot 29-account-bottom 6 -startTab 3 -demoAccount -scrollTo bottom
+          shot 30-account-consents 6 -startTab 3 -demoAccount -accountPage consents
+          shot 31-account-blocked 6 -startTab 3 -demoAccount -accountPage blocked
+          shot 32-account-delete 6 -startTab 3 -demoAccount -accountPage delete
+
+          # 설정 탭
+          shot 33-settings-top 5 -startTab 4 -demoExpiryHours 130
+          shot 34-settings-middle 6 -startTab 4 -demoExpiryHours 130 -scrollTo bluetooth
+          shot 35-settings-bottom 6 -startTab 4 -demoExpiryHours 130 -scrollTo bottom
+
+          # 다크 모드
           xcrun simctl ui "$UDID" appearance dark
-          shot 18-driving-dark 5 -startTab 0 -demoRecording
-          shot 19-trip-detail-dark 12 -startTab 1 -openFirstTrip -showCurves
-          shot 20-stats-dark 6 -startTab 2
+          shot 36-dark-main 5 -startTab 0
+          shot 37-dark-driving 5 -startTab 0 -demoRecording
+          shot 38-dark-list 5 -startTab 1
+          shot 39-dark-detail 12 -startTab 1 -openFirstTrip -showCurves
+          shot 40-dark-curves 8 -startTab 1 -openFirstTrip -detailSection curves
+          shot 41-dark-stats 6 -startTab 2
+          shot 42-dark-signup 7 -startTab 3 -onboardingStep 1 -scrollTo bottom -shareOn
+          shot 43-dark-settings 5 -startTab 4 -demoExpiryHours 130
 
           rm -f "$OUT/warmup.png"
           ls -la "$OUT"

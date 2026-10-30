@@ -191,6 +191,9 @@ struct OnboardingView: View {
 
     init(initialStep: Int = 0) {
         _step = State(initialValue: min(max(initialStep, 0), 4))
+        if Demo.has("-shareOn") {
+            _shareTrips = State(initialValue: true)
+        }
         if Demo.isOn && initialStep >= 4 {
             _nickname = State(initialValue: "산길러")
             _privacyAgreed = State(initialValue: true)
@@ -217,6 +220,7 @@ struct OnboardingView: View {
                     .tint(.blue)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         switch step {
@@ -226,9 +230,14 @@ struct OnboardingView: View {
                         case 3: rulesStep
                         default: finishStep
                         }
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom")
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .demoScroll(proxy)
                 }
                 bottomBar
             }

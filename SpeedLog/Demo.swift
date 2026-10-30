@@ -1,5 +1,19 @@
 import Foundation
 import CoreLocation
+import SwiftUI
+
+extension View {
+    /// 화면 캡처용: 실행 옵션 `-scrollTo 이름`으로 지정한 곳까지 스크롤
+    func demoScroll(_ proxy: ScrollViewProxy) -> some View {
+        onAppear {
+            guard let target = Demo.value("-scrollTo") else { return }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                proxy.scrollTo(target, anchor: target == "bottom" ? .bottom : .top)
+            }
+        }
+    }
+}
 
 /// 화면 캡처용 예시 모드.
 /// 시뮬레이터에서 실행 옵션 `-demo`를 줄 때만 켜지고, 일반 사용자에게는 절대 켜지지 않음.
@@ -32,7 +46,10 @@ enum Demo {
             hideEnds: true,
             hideRadius: 500,
             consents: [consent(.age14), consent(.privacy), consent(.communityRules), consent(.locationSharing)],
-            blocked: []
+            blocked: [
+                BlockedUser(id: "u1", nickname: "광고계정", date: created.addingTimeInterval(3 * 86_400)),
+                BlockedUser(id: "u2", nickname: "새벽질주", date: created.addingTimeInterval(8 * 86_400))
+            ]
         )
     }
 
