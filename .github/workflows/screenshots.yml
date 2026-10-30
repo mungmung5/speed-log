@@ -4,6 +4,11 @@ name: Screenshots
 # 결과는 screenshots 브랜치와 Actions 결과물(artifact)에 저장돼요.
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "클라우드 Mac 종류 (기본 Apple Silicon이 부족하면 macos-15-intel)"
+        required: false
+        default: macos-latest
   push:
     branches: [main]
     paths:
@@ -13,12 +18,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: screenshots
+  group: screenshots-${{ inputs.runner || 'macos-latest' }}
   cancel-in-progress: true
 
 jobs:
   screenshots:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-latest' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +35,13 @@ jobs:
             -o SpeedLog/DemoRoute.json || true
           python3 -c "import json;d=json.load(open('SpeedLog/DemoRoute.json'));r=d['routes'][0];print(len(r['geometry']['coordinates']),'coords',round(r['distance']),'m')" \
             || { echo "Using synthetic route"; rm -f SpeedLog/DemoRoute.json; }
+
+      - name: Use the newest Xcode
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST"; fi
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios || true
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -178,4 +190,6 @@ jobs:
           cp "$RUNNER_TEMP"/shots/*.png .
           git add ./*.png
           git commit -qm "Screenshots for ${{ github.sha }}"
-          git push -f origin HEAD:screenshots
+          BRANCH=screenshots
+          if [ "${{ inputs.runner || 'macos-latest' }}" != "macos-latest" ]; then BRANCH="screenshots-${{ inputs.runner }}"; fi
+          git push -f origin "HEAD:$BRANCH"
